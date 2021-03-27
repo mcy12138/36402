@@ -1,0 +1,163 @@
+---
+title: "36-402 DA Exam 2"
+author: "Carl Yang (yufeiy3)"
+date: "4/24/2020"
+output: pdf_document
+linestretch: 1.241
+fontsize: 12pt
+---
+
+
+```{r setup, include = FALSE}
+## By default, do not include R source code in the PDF. We do not want to see
+## code or output, only your text and figures.
+knitr::opts_chunk$set(echo = FALSE)
+health = read.csv("vietnam-health-cleaned.csv")
+```
+
+
+# Exploratory Data Analysis
+
+   
+```{r,fig.width=6, fig.height=5, fig.cap="Participation in health exams based on job status"}
+Have_exam = subset(health, HadExam==1)
+No_exam = subset(health, HadExam==0)
+barplot(cbind(table(No_exam$Jobstt), table(Have_exam$Jobstt)), beside=T, main="People not having health exmas(Left) vs. having exams(Right)", xlab="0 for No Exam (Left);                       1 for Having Exams (Right) ", legend=c("housewife", "other", "retirer", "stable", "student", "unstable"))
+
+```
+
+
+```{r, fig.width=4, fig.height=3, fig.cap="Barplot displaying the number of respondents who had a check-up in the past 12 months"}
+counts <- table(health$HadExam)
+barplot(counts, main="Distribution of response varible HadExam",
+   xlab="0 for No; 1 for Yes")
+```
+
+   
+```{r, fig.width=8, fig.height=7, fig.cap="Respondents' rating of value and quality of medical service"}
+par(mfrow = c(4,2))
+barplot(table(health$Wsttime), main="Are check-ups a waste of time?", xlab="0 for No; 1 for Yes")
+barplot(table(health$Wstmon), main="Are check-ups a waste of money?", xlab="0 for No; 1 for Yes")
+barplot(table(health$Lessbelqual), main="Have little faith in the quality of medical service?", xlab="0 for No; 1 for Yes")
+barplot(table(health$NotImp), main="Are check-ups not urgent or important?", xlab="0 for No; 1 for Yes")
+hist(health$Tangibles, main="Perceived quality of medical equipment and personnnel", xlab="Level from 1 to 5", col="grey")
+hist(health$Empathy, main="Perceived thoughtfulness and responsibility of medical staff", xlab="Level from 1 to 5", col="grey")
+barplot(table(health$SuitFreq), main="How often you believe check-ups should be done?", xlab="Months")
+```
+   
+```{r, fig.width=5, fig.height=4, fig.cap="Respondents' rating of quality of information they receive in check-ups"}
+par(mfrow = c(2,2))
+hist(health$SuffInfo, main="Rating of the sufficiency of information", xlab="1 to 5 scale", col="grey")
+hist(health$AttractInfo, main="Rating of the attractiveness of information ", xlab="1 to 5 scale", col="grey")
+hist(health$ImpressInfo, main="Rating of the impressiveness of information ", xlab="1 to 5 scale", col="grey")
+hist(health$PopularInfo, main="Rating of the popularity of information ", xlab="1 to 5 scale", col="grey")
+```
+
+   
+# Initial Modeling and Diagnostics
+
+   
+   
+```{r, results="hide"}
+m1 = glm(HadExam~Age + Sex + Jobstt + height + weight + BMI + Wsttime + Wstmon + Lessbelqual + NotImp + Tangibles + Empathy + SuitFreq, family = binomial, data = health)
+summary(m1)
+```
+  
+We call GLM on the variables like $HadExam \sim Age + Sex + Jobstt + height + weight + BMI + Wsttime + Wstmon + Lessbelqual + NotImp + Tangibles + Empathy + SuitFreq$.
+
+Note that Job Status variable in Model 1 will use housewife as the base line and other categories as comparison groups. Similarly SuitFreq uses 12month check-up as the base line. Then we can also take Model 1 as 
+
+$HadExam$ = $\beta_0 + \beta_1 Age + \beta_2 Sex(male) + \beta_3 Jobstt(other) + \beta_4 Jobstt(retirer) + \beta_5 Jobstt(stable) + \beta_6 Jobstt(student) + \beta_7 Jobstt(unstable) + \beta_8 height + \beta_9 weight + \beta_{10} BMI + \beta_{11} Wsttime(yes) + \beta_{12} Wstmon(yes) + \beta_{13} NotImp(yes) + \beta_{14} Tangibles + \beta_{15} Empathy + \beta_{16} SuitFreq(18m) + \beta_{17} SuitFreq(6m)  + \beta_{18} SuitFreq(g18m) + \epsilon$ 
+   
+
+
+```{r, results="hide"}
+m2 = step(m1, direction = "both", trace = 0)
+summary(m2)
+```
+   
+
+
+Model 2: $HadExam$ = $\beta_0 + \beta_1 Jobstt(other) + \beta_2 Jobstt(retirer) + \beta_3 Jobstt(stable) + \beta_4 Jobstt(student) + \beta_5 Jobstt(unstable) + \beta_{6} Wsttime(yes) + \beta_{7} NotImp(yes) + \beta_8 SuitFreq(18m) + \beta_9 SuitFreq(6m)  + \beta_{10} SuitFreq(g18m) + \epsilon$
+
+
+   
+```{r, results="hide"}
+m3 = update(m2, ~ .  + HealthIns + SuffInfo + AttractInfo + ImpressInfo + PopularInfo + HealthIns : SuffInfo + HealthIns : AttractInfo + HealthIns : ImpressInfo + HealthIns : PopularInfo)
+summary(m3)
+```
+
+
+Model 3: $HadExam$ = $\beta_0 + \beta_1 Jobstt(other) + \beta_2 Jobstt(retirer) + \beta_3 Jobstt(stable) + \beta_4 Jobstt(student) + \beta_5 Jobstt(unstable) + \beta_{6} Wsttime(yes) + \beta_{7} NotImp(yes) + \beta_8 SuitFreq(18m) + \beta_9 SuitFreq(6m)  + \beta_{10} SuitFreq(g18m) + \beta_{11} HealthIns(yes) + \beta_{12} SuffInfo + \beta_{13} AttractInfo + \beta_{14} ImpressInfo + \beta{15} PopularInfo + \beta{16} HealthInsyes:SuffInfo + \beta_{17} HealthInsyes:AttractInfo + \beta_{18} HealthInsyes:ImpressInfo + \beta_{19} HealthInsyes:PopularInfo + \epsilon$
+
+
+```{r, results="hide"}
+## Global goodness-of-fit
+print(1 - pchisq(m3$deviance, df=2048))   
+```
+
+
+```{r, message=FALSE, warning=FALSE, fig.width=5, fig.height=4, fig.cap="Calibration test on Model 3 by three sets of smoothers."}
+# Model 3 well calibrated
+library(np)
+library(FNN)
+p = fitted(m3)
+spline = smooth.spline(health$HadExam ~ p, df=10)
+knn = knn.reg(train = matrix(p, ncol=1), y=health$HadExam, k=35)
+kernel = npreg(health$HadExam ~ p, bws=0.075)
+
+plot(p,fitted(spline), main="Model 3 Calibration", xlab="Fitted Y",ylab="Fitted values for different smoothing functions", cex=0.6)
+points(p,fitted(kernel),col="red", cex=0.6) 
+points(p, knn$pred,col="blue", cex=0.6)
+abline(0,1, col="green")
+legend("bottomright",legend=c("Smooth Spline","Kernel","KNN"),
+col=c("black","red","blue"), pch=c(1,1,1,NA))
+```
+   
+
+# Model Inference and Results
+
+
+
+```{r, results="hide"}
+reduced = update(m2, ~ .  + HealthIns + SuffInfo + AttractInfo + ImpressInfo + PopularInfo)
+full = m3
+anova(reduced, full, test="Chisq")
+```
+   
+
+
+```{r, results="hide"}
+m4 = update(m2, ~ .  + HealthIns + SuffInfo + AttractInfo + ImpressInfo + PopularInfo)
+summary(m4)
+```
+
+```{r, results="hide"}
+# Correct method for M4 odds ratio
+logistic = function(x) {exp(x)/(1+exp(x)) }
+beta = coef(m4)
+ell <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 4)
+gam <- sum(ell * beta)
+exp(gam)
+```
+   
+   
+```{r, results="hide"}
+# 95% CI for Model 4 ratio
+v = vcov(m4)
+beta = coef(m4)
+ell <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 4)
+gam <- sum(ell * beta)
+
+#################################
+# Compute confidence intervals:
+#################################
+se = sqrt(ell %*% v %*% ell)
+ci = exp(c(gam + qnorm(0.025)*se, gam + qnorm(0.975)*se))
+print(round(ci, 3))
+```
+
+
+
+
+

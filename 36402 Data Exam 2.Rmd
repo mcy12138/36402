@@ -1,0 +1,242 @@
+---
+title: "36-402 DA Exam 2"
+author: "Carl Yang (yufeiy3)"
+date: "4/24/2020"
+output:
+  html_document:
+    df_print: paged
+linestretch: 1.241
+fontsize: 12pt
+---
+
+
+```{r setup, include = FALSE}
+## By default, do not include R source code in the PDF. We do not want to see
+## code or output, only your text and figures.
+knitr::opts_chunk$set(echo = FALSE)
+health = read.csv("vietnam-health-cleaned.csv")
+```
+
+
+# Introduction
+
+
+In this society where medical care for serious diseases can be very expensive and therefore may impose serious harships on patients, regular health examinations could help a lot to prevent and detect potential health problems. However, even though regular health exams can be beneficial to people both physically and financially, regualr health exams have not been in widespread use in Vietnam due to complicated reasons. As a consultant of the Vietnamese Ministry of Health, I utilizes the survey data from Q-H Vuong's research, which contains information on the health exam participation rate, demographic and personal information of respondents, value and quality of medical service, and quality of exam results by Vietnamese respondents. This research aims to discover possible obstacles, if any, that prevent poeple from doing annual health exams with the knowledge of respondents' personal information and their attitudes toward health exam service quality. Understanding such possible relationship could lead to, among other things, a better view of people's willingness to do regualr health exams and help policymakers adjust their public relations campaign strategies on how to make health exam more attractive to the general public. **(1)**
+
+
+In fact, respondents of this survey give a not very satisfactory ratings of the value and quality of medical service, and also quality of information they receive in the health examinations in Vietnam. Only a few more than half of the sample population have received annual check-ups in the past 12 months due to various reasons. It is also found that peolpe's subjective awareness of the necesscity and urgency of regualr health examinations are major obstacles that make them less likely to receive check-ups. Based on our analysis, we recommend the government to make more publicity on the time-effectiveness of health check-ups instead of the marketing campaign on the quality of information in check-ups. **(2)** Details on how such relationship is defined and discovered will be discussed in the following report.
+
+
+# Exploratory Data Analysis
+
+
+The "Health Examination" dataset from Q-H Vuong's survey contains 2068 responses, including respondents' pesonal information, their ratings for health exam facilities and services, and their attidtudes toward the quality of information they received in the check-ups. In order to find the relationship between people's willingness to receive regular check-ups and the casues to prevent this willingness, the variable "HadExam" which indicates whether the respondent had a check-up in the past 12 months will be a good response variable. Here we use multiple other related variables from three major fields (perosnal infomation; rating of medical service; rating of check-up information) to learn the relationship. Our initial thoughts include key variables like Age, Sex, Jobstt, Wsttime, Wstmon, Not Imp, SuitFreq, and AttractInfo. Figure 1 below shows the barplot of respondents's check-up habits based on their job status. It's interesting to find out that students and respondents with unstable job status are less likely to receive health exams since both groups are outnumbered by their no-exam section compared to the exam one. While other groups seem to be more willing to accept regualr check-ups, the proportion of exam receivers and the true relationship require further investigation. The Age variable is right skewed and we observe more female respondents than male. We'll disucuss them in later studies. Quality-related information will also be explored in the next section.
+
+The continuous variables in this dataset are Age, Sex, height, weight, BMI, and a series of variables measured in levels, including Tangibles, Empathy, SuffIno, AttractInfo, ImpressInfo, and PopularInfo. Others are treated as categorical variables, like HadExam, Jobstt, HealthIns, Wsttime, Wstom, Lessbelqual, and NotImp. **(1)**
+
+
+   
+```{r,fig.width=6, fig.height=5, fig.cap="Participation in health exams based on job status"}
+Have_exam = subset(health, HadExam==1)
+No_exam = subset(health, HadExam==0)
+barplot(cbind(table(No_exam$Jobstt), table(Have_exam$Jobstt)), beside=T, main="People not having health exmas(Left) vs. having exams(Right)", xlab="0 for No Exam (Left);                       1 for Having Exams (Right) ", legend=c("housewife", "other", "retirer", "stable", "student", "unstable"))
+
+```
+ 
+
+
+As specified above, HadExam should be our response variable. Figure 2 suggests that 1059 of the 2068 respodents had a check-up in the past 12 months, which account for 51.2% of the sample population, while 1009 respodents did not do so, accounting for the remaining 48.8%. **(2)** The two groups have very close numbers and we can guess only a litle more than a half Vietnamese are likely to have an annual check-up based on this barplot. Such situation is far from ideal and needs immediate attention.
+
+
+```{r, fig.width=4, fig.height=3, fig.cap="Barplot displaying the number of respondents who had a check-up in the past 12 months"}
+counts <- table(health$HadExam)
+barplot(counts, main="Distribution of response varible HadExam",
+   xlab="0 for No; 1 for Yes")
+```
+
+
+   
+At this moment, we shold ask why so many people do not go to health exams. Are they not satisfied with the quality of the health check-ups or they simply believe health exams are not a necessary thing? Figure 3 explores possible answers to these questions: the ratings from respondents show that although not too many people have little faith in the quality of medical service, many of them think the services offered in health check-ups are mediocre, resulting a average middle score of 3 on hardwares and softwares of check-ups. In general, the medical service providers leave people a not very satisfactory impression on average and this might be a cause that prevents people from taking health check-ups. 
+
+Meanwhile, about 50% of all respondents think health check-ups are a waste of time and are not something urgent or important, and some believe regualr check-ups are not necessary, especially annual ones as shown in the bottom plot. This information suggests that some propaganda on the importance and time-effectiveness of health check-ups should be implemented in order to change people's subjective willingness of regular health exams.
+
+   
+```{r, fig.width=8, fig.height=7, fig.cap="Respondents' rating of value and quality of medical service"}
+par(mfrow = c(4,2))
+barplot(table(health$Wsttime), main="Are check-ups a waste of time?", xlab="0 for No; 1 for Yes")
+barplot(table(health$Wstmon), main="Are check-ups a waste of money?", xlab="0 for No; 1 for Yes")
+barplot(table(health$Lessbelqual), main="Have little faith in the quality of medical service?", xlab="0 for No; 1 for Yes")
+barplot(table(health$NotImp), main="Are check-ups not urgent or important?", xlab="0 for No; 1 for Yes")
+hist(health$Tangibles, main="Perceived quality of medical equipment and personnnel", xlab="Level from 1 to 5", col="grey")
+hist(health$Empathy, main="Perceived thoughtfulness and responsibility of medical staff", xlab="Level from 1 to 5", col="grey")
+barplot(table(health$SuitFreq), main="How often you believe check-ups should be done?", xlab="Months")
+```
+   
+   
+Aother aspect that can show people's satisfaction on the health check-ups are tehir ratings on the feedbacks during the check-up process. Unfortunately, Figure 4 shows that people's feelings on these feedbacks are not generally positive. All the four variables have a median of 3 and mean values around 2.8, except for SuffInfo which has a mean score of 3.01. We can clearly see that people tink the information gained from health check-ups are as useful and sufficient as expected. This might be an obstacle again to prevent people from doing regualr check-ups. However, whether the characteristics of the information, like impressiveness, play a significant role in driving people to check-ups still need further analysis. **(3)** 
+
+```{r, fig.width=5, fig.height=4, fig.cap="Respondents' rating of quality of information they receive in check-ups"}
+par(mfrow = c(2,2))
+hist(health$SuffInfo, main="Rating of the sufficiency of information", xlab="1 to 5 scale", col="grey")
+hist(health$AttractInfo, main="Rating of the attractiveness of information ", xlab="1 to 5 scale", col="grey")
+hist(health$ImpressInfo, main="Rating of the impressiveness of information ", xlab="1 to 5 scale", col="grey")
+hist(health$PopularInfo, main="Rating of the popularity of information ", xlab="1 to 5 scale", col="grey")
+```
+
+   
+It is interesting to see that respondents are divided into two groups that have roughly the same size in many variables. This might suggest that some serious reasons that can drive people into two opposites are still under discovery. Moreover, students and people with unstable jobs are more likely to avoid doing regular check-ups. That may be due to their relatively inferior financial status to afford check-ups, but no solid conclusions can be made at this time. **(4)** These initial findings might help us understand the health check-ups situations in Vietnam in further investigation. 
+
+
+# Initial Modeling and Diagnostics
+
+
+Our first guess on the modeling will be a general linear model that predicts the response variable as a function of all the demographic and personal variables excluding Health Insurance, and all the value and quality of medical service variables. **(1)**   
+   
+```{r, results="hide"}
+m1 = glm(HadExam~Age + Sex + Jobstt + height + weight + BMI + Wsttime + Wstmon + Lessbelqual + NotImp + Tangibles + Empathy + SuitFreq, family = binomial, data = health)
+summary(m1)
+```
+  
+We call GLM on the variables like $HadExam \sim Age + Sex + Jobstt + height + weight + BMI + Wsttime + Wstmon + Lessbelqual + NotImp + Tangibles + Empathy + SuitFreq$.
+
+Note that Job Status variable in Model 1 will use housewife as the base line and other categories as comparison groups. Similarly SuitFreq uses 12month check-up as the base line. Then we can also take Model 1 as 
+
+$HadExam$ = $\beta_0 + \beta_1 Age + \beta_2 Sex(male) + \beta_3 Jobstt(other) + \beta_4 Jobstt(retirer) + \beta_5 Jobstt(stable) + \beta_6 Jobstt(student) + \beta_7 Jobstt(unstable) + \beta_8 height + \beta_9 weight + \beta_{10} BMI + \beta_{11} Wsttime(yes) + \beta_{12} Wstmon(yes) + \beta_{13} NotImp(yes) + \beta_{14} Tangibles + \beta_{15} Empathy + \beta_{16} SuitFreq(18m) + \beta_{17} SuitFreq(6m)  + \beta_{18} SuitFreq(g18m) + \epsilon$ 
+   
+
+
+```{r, results="hide"}
+m2 = step(m1, direction = "both", trace = 0)
+summary(m2)
+```
+   
+   
+There are 13 variables in Model 1 and many of them are not statistically significant based on the p-values. Thus we make our second guess of modeling by applying a stepwise selection procedure in both directions to remove redundant variables and only keep the significant ones. **(2)** 
+
+Model 2: $HadExam$ = $\beta_0 + \beta_1 Jobstt(other) + \beta_2 Jobstt(retirer) + \beta_3 Jobstt(stable) + \beta_4 Jobstt(student) + \beta_5 Jobstt(unstable) + \beta_{6} Wsttime(yes) + \beta_{7} NotImp(yes) + \beta_8 SuitFreq(18m) + \beta_9 SuitFreq(6m)  + \beta_{10} SuitFreq(g18m) + \epsilon$
+
+Model 2 has an AIC value of 2467.4 which is less than 2477.6 from Model 1. 
+
+   
+```{r, results="hide"}
+m3 = update(m2, ~ .  + HealthIns + SuffInfo + AttractInfo + ImpressInfo + PopularInfo + HealthIns : SuffInfo + HealthIns : AttractInfo + HealthIns : ImpressInfo + HealthIns : PopularInfo)
+summary(m3)
+```
+
+
+We then build our Model 3 by adding health insurance and the quality of information variables to model 2, and also including interactions to check if the quality of information variables have different associations between patients with and without health insurance. **(3)**
+
+Model 3: $HadExam$ = $\beta_0 + \beta_1 Jobstt(other) + \beta_2 Jobstt(retirer) + \beta_3 Jobstt(stable) + \beta_4 Jobstt(student) + \beta_5 Jobstt(unstable) + \beta_{6} Wsttime(yes) + \beta_{7} NotImp(yes) + \beta_8 SuitFreq(18m) + \beta_9 SuitFreq(6m)  + \beta_{10} SuitFreq(g18m) + \beta_{11} HealthIns(yes) + \beta_{12} SuffInfo + \beta_{13} AttractInfo + \beta_{14} ImpressInfo + \beta{15} PopularInfo + \beta{16} HealthInsyes:SuffInfo + \beta_{17} HealthInsyes:AttractInfo + \beta_{18} HealthInsyes:ImpressInfo + \beta_{19} HealthInsyes:PopularInfo + \epsilon$
+
+
+
+
+```{r, results="hide"}
+## Global goodness-of-fit
+print(1 - pchisq(m3$deviance, df=2048))   
+```
+
+Performing a Chi-squared test to assess the goodness of fit of Model 3, we find a p-value of 6.685647e-08 which is less than 0.05. Therefore we conclude that the model is a not good fit to the data because it it is not sufficient to explain the data. **(4)** However this result is not absolute, and we then investigate further by checking whether the model is well calibrated. 
+
+
+
+   
+Model 3 yields fitted values that are very close to the Y=X line. The same patterns hold for Smooth Splines and Kernel but not so much the same for KNN since we are using a K value of 35, as shown in Figure 5. Note that we can increase the number of K to obtain more concentrated prediction data points and less variance, so the volatility generated by KNN should not be a big probelm. Therefore, we can say that model 3 is well-calibrated. Possible improvements like removing the interaction terms and adding other omitted variables in the model can be employed. **(5)** 
+   
+```{r, message=FALSE, warning=FALSE, fig.width=5, fig.height=4, fig.cap="Calibration test on Model 3 by three sets of smoothers."}
+# Model 3 well calibrated
+library(np)
+library(FNN)
+p = fitted(m3)
+spline = smooth.spline(health$HadExam ~ p, df=10)
+knn = knn.reg(train = matrix(p, ncol=1), y=health$HadExam, k=35)
+kernel = npreg(health$HadExam ~ p, bws=0.075)
+
+plot(p,fitted(spline), main="Model 3 Calibration", xlab="Fitted Y",ylab="Fitted values for different smoothing functions", cex=0.6)
+points(p,fitted(kernel),col="red", cex=0.6) 
+points(p, knn$pred,col="blue", cex=0.6)
+abline(0,1, col="green")
+legend("bottomright",legend=c("Smooth Spline","Kernel","KNN"),
+col=c("black","red","blue"), pch=c(1,1,1,NA))
+```
+   
+
+
+
+# Model Inference and Results
+
+
+   
+Model 3 includes several inteaction terms between whetehr people have health insurance and their ratings for quanlity of information in health check-ups: HealthInsyes:SuffInfo, HealthInsyes:AttractInfo, HealthInsyes:ImpressInfo, and HealthInsyes:PopularInfo. The presence of the interaction terms will change the interpretation of the explanatory variables in our model. For instance, the term "HealthInsyes:SuffInfo" controls the effect of SuffInfo on response variable depending on whether the respondent has a Health Insurance or not. For respondents without health insurance, the effect of SuffInfo is $\beta_{12}$, -0.2228, then 1 score increase in SuffInfo will increase the log odds of respondents having check-up by -0.2228. But for those with health insurance, the effect of SuffInfo is $\beta_{12} + \beta_{16}$, -0.05; so for respondents with insurance, 1 score increase in SuffInfo will increase the log odds of respondents having check-ups by -0.05. Similarly, for people without health insurance, 1 score increase in AttractInfo will increase the log odds of respondents having check-ups by $\beta_{13}$ 0.136, and for those with insurance, 1 score increase in SuffInfo will increase the log odds of respondents having check-ups by $\beta_{13} + \beta_{17}$, 0.127. **(1)**
+   
+
+
+
+```{r, results="hide"}
+reduced = update(m2, ~ .  + HealthIns + SuffInfo + AttractInfo + ImpressInfo + PopularInfo)
+full = m3
+anova(reduced, full, test="Chisq")
+```
+   
+Since the test statistics in Model 3 shows that many of the interaction terms have large p-values, we performed a Chi-squared test on two models to see if there is s a significant difference between the full Model 3 and the reduced model without interactions. We have a p-value is 0.8644 which is much larger than the 0.05 level. Thus we do not have sufficient evidence to reject the null hypothesis that there is no significant difference between the reduced and full model. This means we don't have to include the interaction terms in our later analysis since the effects of quality of information variables have on the response HadExam have no significant difference for people with or without health insurance. **(2)** We call this reduced model Model 4 and use it in our later analysis.
+
+
+
+
+```{r, results="hide"}
+m4 = update(m2, ~ .  + HealthIns + SuffInfo + AttractInfo + ImpressInfo + PopularInfo)
+summary(m4)
+```
+
+```{r, results="hide"}
+# Correct method for M4 odds ratio
+logistic = function(x) {exp(x)/(1+exp(x)) }
+beta = coef(m4)
+ell <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 4)
+gam <- sum(ell * beta)
+exp(gam)
+```
+   
+Now let's take a look at the odds ratio of having a check-up for peolpe with the most belief in thequality of information (rating each item 5) and those with the least belief in the quality of information (rating each item 1). Our model yields a result of odds ratio 1.38947. This means that the odds of having a check-up for firm belivers of the quality of information are 1.38947 times of the odds of having a check-up for serious doubters of the quality of information. The odds (and hence probability) of having a check-up are increased if people believe in the quality of information. We could also express the increase by saying that the odds are rising by approximately 39%. But whether such changes in odds are significant needs further testing. **(3)**
+   
+   
+
+
+```{r, results="hide"}
+# 95% CI for Model 4 ratio
+v = vcov(m4)
+beta = coef(m4)
+ell <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 4)
+gam <- sum(ell * beta)
+
+#################################
+# Compute confidence intervals:
+#################################
+se = sqrt(ell %*% v %*% ell)
+ci = exp(c(gam + qnorm(0.025)*se, gam + qnorm(0.975)*se))
+print(round(ci, 3))
+```
+
+We then create a 95% confidence intervals for the odds ratio above: the lower limit of the confidence interval is 0.934 and the upper limit is 2.066. Although 1.389 is included in the interval, we observe that 1 is also included in the interval. This means that the odds ratio can also be 1, then there will be no statistically significant difference between the odds of having a check-up for the belivers and the doubters of the quality of information. Therefore, we conclude that there is no significant odds difference of having a check-up for peolpe with the most belief in thequality of information and those with the least belief in the quality of information. Moreover, we can infer that people's willingness of attending regular health check-ups are not significantly influenced by their ratings of the quality of information received in check-ups. We will not recommend publicity or marketing campaign focusing on the quality of information patients receive in check-ups as these methods are not effective in attracting more poeple to health examinations. **(4)**
+
+Even though the quality of information does not play a significant role in determining people's willingness to get regular check-ups, we still find other factors that may have an important influence on people's health check-up habits. We find some variables in the model that are both statistically significant and have relatively large negative coefficients, like SuitFreqg18m. The coeficient of SuitFreq g18m is -1.1112 which is the log odds of going to annual check-up increase rate compare to the base line SuitFreq12m, similarly for SuitFerq 18m. We can treat this variable as an important factor that make a person less likely to get check-up every twelve months due to their understainding of the regularity of health check-up. On the other hand, students and people with unstable jobs are less likely to receive health check-ups, who might need financial assistance or more affordable health services. This idea leads us to find the most important factors that prevent people doing 12-month check-ups. They are SuitFreq, NotImp, Wsttime, and Jobstt. We suggest the government to change the publicity campgaign strategies to address these issues and change people's subjective awareness of health examinations.
+
+   
+
+# Conclusions
+
+
+
+The results of this analysis provide evidence of factors that make a person more or less likely to get regular health examination. We fitted four models througout the analysis: one genrealized linear model with perosnal information and quality of medical service variables expcept for Health Insurance; another stepwise variable-selected model; and two models adding the remaining quality of information variables with and without interactions with Health Insurance.
+
+Only a half of the sample population have taken check-ups in the past 12 months. And the medical service providers leave people a not very satisfactory impression on average. Most importantly, the major obstacles that prevent people from doing regualr annual check-ups are divided into two reasons. One is peolpe's subjective awareness of the time-effectiveness of such check-ups: respondents think health check-ups are a waste of time and are not something urgent or important, and some believe regualr check-ups are not necessary, especially annual ones. Another one is people's job status, in which students and unstable workers are less likely to get annual check-ups. **(1)**
+
+
+
+These obstacles need immediate attention by the government of Vietnam. It is acknowledged that Vietnam is not a developed country and may not have a robust national health service system. Vietnameses' awareness of the time-effectiveness and urgency of regualr health check-ups are not cultivated, and such ideas are further lagged by the unsatisfying medical service. We suggest the government to change the publicity campgaign strategies and necessary educations to address these issues and change people's subjective awareness of health examinations. We will not recommend marketing campaign focusing on the quality of information patients receive in check-ups as these methods are not effective in attracting more poeple to health examinations. Possible reforms on the quality of medical service and providing more affordable health examinations to students and low income groups are also great tools in attracting more people who get annual health exams. **(2)**
+
+
+
+However, one should be careful that our model is not a fit good enough for the data. Some varibales may have multicolinearity issues; some get only give associations but not causations. For example, people who think regualr check-ups are not important may believe check-ups can be done less often than every 18 months. But these variables are double-counted in our model and the quality of information variables are ommitted. Significance of some variables may be caused by others. Also note that the dataset only include samples from Hanoi, making it less accurate to make a nationwide prediction. We expect making better inference given more time and data. **(3)**
+
+
