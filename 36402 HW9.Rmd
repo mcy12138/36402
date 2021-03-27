@@ -1,0 +1,238 @@
+---
+title: "36402 HW9"
+author: "Carl Yang"
+date: "4/05/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Q1
+
+```{r}
+abalone = read.csv("abalonemt.csv")
+```
+
+```{r}
+library(np)
+m1 = lm(log(Shucked.weight)~log(Diameter)+log(Length)+log(Height), data=abalone)
+n = nrow(abalone)
+bws = apply(abalone[,c(2,3,4)], 2, sd) / (n^0.2)
+m2 = npreg(Shucked.weight~Diameter+Length+Height, data=abalone, bws=bws, residuals=T)
+m3 = smooth.spline(x=abalone$Diameter*abalone$Length*abalone$Height, y=abalone$Shucked.weight)
+```
+
+## (a)
+
+```{r}
+y1 = exp(fitted(m1))
+y2 = fitted(m2)
+y3 = fitted(m3)
+plot(y3~y1, pch=".", xlab="Linear M1", ylab="Spline M3",
+     main="Linear vs. Smooth Spline of Fitted values of Shucked Weight")
+```
+
+The scatter plot shows that fitted values from Model 1 and Model 3 have very similar predicted values. There are still some outliers at the tails which has much higher values from smooth spline than linear regression, and some lower values as well.
+
+```{r}
+par(mfrow=c(1,2))
+res1 = resid(m1)
+res2 = resid(m2)
+res3 = resid(m3)
+plot(y1, res1, main = "M1 residual plot", xlab="y.hat", ylab="Residuals", pch=".")
+abline(h=0, lty=1)
+plot(y3, res3, main = "M3 residual plot", xlab="y.hat", ylab="Residuals", pch=".")
+abline(h=0, lty=1)
+boxplot(res1, main = "Boxplot of M1 model residuals")
+boxplot(res3, main = "Boxplot of M3 model residuals")
+qqnorm(res1, main = "Normal Q-Q plot of M1 Residuals")
+qqline(res1)
+qqnorm(res3, main = "Normal Q-Q plot of M3 Residuals")
+qqline(res3)
+hist(res1, main="Histogram of M1 residuals")
+hist(res3, main="Histogram of M3 residuals")
+```
+
+```{r}
+par(mfrow=c(2,2)) 
+plot(res1~log(abalone$Length)*log(abalone$Diameter)*log(abalone$Height),pch=".") 
+spline=(abalone$Diameter*abalone$Length*abalone$Height) 
+plot(res3~spline,pch=".")
+```
+
+The residual plot of M1 the linear regression shows that the residuals are approximately randomly distributed with mean 0 and constant variance. The boxplot for residuals are approximately symmetric and the residuals are mostly fall on the fitted line in the normal QQ plot. Histogram of residuals are approximately normal and plots against the predictor variables show roughly random distribution. Thus all the linear assumptions are preserved for the linear regression model from the residual analysis.
+
+For M3 the smooth spline regression, the residuals in the residual plot are not randomly distributed: we can see that the variance of the residuals get larger at the tail. Things work fine for boxplot normal QQ plot and histogram. But when we plot the residuals against the predictors, they show obvious pattern again which indicates that the residuals are not independent of the explanatory variables. 
+
+Thus the non-parametric bootstrap with resampling seems to be the most appropriate method since it only assumes that the (Xi,Yi) pairs are independent of each other.
+
+
+## (b)
+
+```{r}
+edof1 = length(m1$coefficients)
+edof2 = 101.436 # from HW8
+edof3 = m3$df
+```
+
+The effective degrees of freedom for M1 is 4, for M2 is 101.436, and for M3 is 30.05387. Kernel regression has the largest EDF since it is the most flexible and not based on many assumptions about our data. Smooth spline has the second largest EDF because it is constrained by some parameters. Linear model assumes linearity between explanatory and response variables, which is constrained by all beta parameters, and thus has the lowest EDF.
+
+
+## (c)
+
+```{r}
+set.seed(1000)
+B = 1000
+m = matrix(nrow = B, ncol = 5)
+x = data.frame(rbind(c(75,55,10), c(450,350,115), c(545,425,140),
+                     c(615,480,165), c(815,650,250)))
+colnames(x)=c("Length","Diameter","Height")
+for (i in 1:B) {
+  order = sample(seq(1, n), size=n, replace = TRUE)
+  new_data = abalone[order, ]
+  new_m1 = lm(log(Shucked.weight)~log(Length)+log(Diameter)+log(Height),data=new_data)
+  m[i, ] = predict(new_m1, newdata=x)
+}
+
+new_y1 = colMeans(m)
+bias = exp(new_y1) - exp(predict(m1, newdata = x))
+bias
+```
+
+The estimated bias of exp($\hat{\tilde{r}(x)}$) are shown above for each vector. We assume that the distribution of $\hat{\tilde{r}(x)}$ is similar to the distribution of the bootstrapped calculation exp($\hat{\tilde{r}(x)}_b^*$). The large difference in bias may be due to the shape of exp(x). The slope of exp(x) increases exponentially so that large increase in explanatory values can cause even larger changes in prediction while the bias term is also much higher.
+
+## (d)
+
+```{r}
+m = matrix(nrow=B, ncol=5)
+for (i in 1:B) {
+  order = sample(seq(1, n), size=n, replace = TRUE)
+  new_data = abalone[order, ]
+  new_m3 = smooth.spline(x = new_data$Length*new_data$Diameter*new_data$Height,
+                         y = new_data$Shucked.weight)
+  m[i, ] = predict(new_m3, x=x$Length*x$Diameter*x$Height)$y
+}
+
+y_hat = predict(m3,x=x$Length*x$Diameter*x$Height)$y
+upper_quantile = function(i) {
+  (quantile(m[, i], 0.975))
+}
+
+lower_quantile = function(i) {
+  (quantile(m[, i], 0.025))
+}
+p1 = 2*y_hat - sapply(1:5, FUN = upper_quantile)
+p2 = 2*y_hat - sapply(1:5, lower_quantile)
+table = x
+table$y_hat = y_hat
+table$p1 = p1
+table$p2 = p2
+colnames(table)[5] = "0.25% pivotal"
+colnames(table)[6] = "97.5% pivotal"
+table
+```
+
+
+# Q2
+
+## (a)
+
+```{r}
+library(MASS)
+mcat = lm(Hwt ~ Bwt, data=cats) # linear model
+ycat = fitted(mcat)
+ymale = ycat[which(cats$Sex=="M")]
+yfemale = ycat[which(cats$Sex=="F")]
+resmale = resid(mcat)[which(cats$Sex=='M')]
+resfemale = resid(mcat)[which(cats$Sex=='F')]
+
+par(mfrow=c(2,2))
+plot(ymale, resmale, main="Male cats residual ploy", xlab="y_hat", ylab="residuals")
+abline(h=0, lty=1)
+boxplot(resmale, main="Boxplot of male residuals") 
+qqnorm(resmale, main="Normal QQ plot of male residuals") 
+qqline(resmale)
+
+par(mfrow=c(2,2))
+plot(yfemale, resfemale, main="Female cats residual ploy", xlab="y_hat", ylab="residuals")
+abline(h=0, lty=1)
+boxplot(resfemale, main="Boxplot of female residuals") 
+qqnorm(resfemale, main="Normal QQ plot of female residuals") 
+qqline(resfemale)
+```
+
+For male cats the residuals in the residual plot are mostly randomly distributed around the zero-line, and the variance is approximately normal. The boxplot is mostly symmetric and residuals seem to be normally distributed based on the normal QQ plot. But the residuals of female cats do not have mean 0 nor constant variance, suggesting that some linearity assumptions may be violated, though they seem to be normally distributed based on the normal QQ plot.
+
+```{r}
+par(mfrow=c(1,2))
+hist(cats$Bwt[which(cats$Sex=="M")], main="Male Cats Weight", xlab="M")
+hist(cats$Bwt[which(cats$Sex=="F")], main="Female Cats Weight", xlab="F")
+```
+
+The histogram shows that the weight distributions of male and female cats vary a lot. The weight distribution of male cats is more unimodal while the distribution of female cats tends to be more right-skewed. The mean and median of male weight are both higher than those of female as well.
+
+## (b)
+
+```{r}
+mf = lm(Hwt~Bwt, data=cats[which(cats$Sex=="F"),]) # model of female
+yf = predict(mf, newdata=cats)
+mm = lm(Hwt~Bwt, data=cats[which(cats$Sex=="M"),])
+ym = predict(mm, newdata=cats)
+
+n=nrow(cats)
+nm = nrow(cats[which(cats$Sex=="M"),])
+nf = nrow(cats[which(cats$Sex=="F"),])
+causal = (ym*nm + yf*nf) / n
+
+plot(cats$Bwt, cats$Hwt, main="Heat Weight vs. Body Weight of Cats",
+     xlab="Body Weight", ylab="Heart Weight")
+lines(cats$Bwt, ycat)
+lines(cats$Bwt, causal, col="blue")
+lines(cats$Bwt, yf, col="green")
+lines(cats$Bwt, ym, col="red")
+legend("topleft", legend = c("Simple Linear", "Causal", "Linear Female", "Linear Male"),
+       col=c("black", "blue", "green", "red"), lty=1)
+```
+
+The simple linear regression is the most appropriate when we know there is no confounding variable. Otherwise if we know Sex is the coufounder then the causal regression is the most appropriate. If we only want to predict for female cats, the simple regression on female cats is the most appropriately, and similarly the simple regression on male cats for male cats only .
+
+
+## (c)
+
+```{r}
+set.seed(2020)
+B = 1000
+T_est = rep(0, B)
+male = cats[which(cats$Sex=='M'),]
+ym = predict(mcat, newdata = male)
+female = cats[which(cats$Sex=='F'),]
+yf = predict(mcat, newdata = female)
+for (i in 1:B) {
+  resmale_b = sample(resmale, nm, replace = T)
+  ym_b = ym + resmale_b
+  mm_b = lm(ym_b ~ male$Bwt)
+  
+  resfemale_b = sample(resfemale, nf, replace = T)
+  yf_b = yf + resfemale_b
+  mf_b = lm(yf_b ~ female$Bwt)
+  
+  T_est[i] = (mm_b$coefficients[1] - mf_b$coefficients[1])^2 +
+    (mm_b$coefficients[2] - mf_b$coefficients[2])^2
+}
+
+T_obs = (mm$coefficients[1] - mf$coefficients[1])^2 +
+  (mm$coefficients[2] - mf$coefficients[2])^2
+
+pvalue = sum(T_est >= T_obs) / B
+pvalue
+```
+
+The p-value is 0.021 which is less than 0.05. Therefore we have sufficient evidence to reject the null hypothesis. We conclude that we are 95% confident that there is a significant difference between the regression lines for male and female cats.
+
+
+
+
+
+
+
+
