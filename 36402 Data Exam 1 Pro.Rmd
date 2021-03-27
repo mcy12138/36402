@@ -1,0 +1,178 @@
+---
+title: "36-402 DA Exam 1"
+author: "Carl Yang (yufeiy3)"
+date: "4/3/2020"
+output:
+  pdf_document: default
+  word_document: default
+  html_document:
+    df_print: paged
+linestretch: 1.241
+fontsize: 12pt
+fontfamily: newtxtext,newtxmath
+---
+
+
+```{r setup, include = FALSE}
+## By default, do not include R source code in the PDF. We do not want to see
+## code, only your text and figures.
+knitr::opts_chunk$set(echo = FALSE)
+college = read.csv("college-data.csv")
+```
+
+# Introduction
+
+
+Education level is playing a more and more important role in determining people's future earnings. Students graduated from top-ranked institutions, which are usually associated with high tuitions, seem to earn more in their later careers. As a consultant of the Department of Education, I utilizes the data from College Scoreboard dataset which contains information about 1300 American colleges and universities, their tuition costs, and prior education and economic status of students. This research aims to characterize the relationship, if any, between school tuition and students' future earnings with the knowledge of diversity of institution types and students' background. Understanding such possible relationship could lead to, among other things, a better view of the worthiness of attending schools with high tuition and help policymakers adjust the future guidance for students and higher education. **(1)**
+
+In fact, it is interesting to observe that the school tuition does have a statistically significant effect on students' future earnings, along with other influential factors like institution types. We expect that students who pay more for their college education tend to earn more on average after they graduate. It is also found that the type of institution, whether it is public, private non or for-profit, impacts the relationship between tuition and earnings. An estimated earnings for a student who graduates from a college like Carnegie Mellon 10 years after enrty will be between [65930.45, 72037.08].**(2)** Details on how such relationship is defined and discovered will be discussed in the following report.
+
+
+# Exploratory Data Analysis
+
+
+The "college" dataset from College Scoreboard contains information about 1300 American colleges and universities, their tuition costs and total enrollment of undergraduate students, and prior education and economic status of students. In order to find the relationship between the worthiness of attending schools with high tuition, the variable "Median Earnings" (MD_MARN_WNE_P10), which records the median earnings (dollars) of students working and not enrolled 10 years after entry, would be a good indicator of the payback of education expense. Here we use several other related variables to learn the relationship: "Price" (PRICE), which is the average net price students pay for their college education, including tuition and other fees minus financial aid; "SAT Score" (SAT_AVG_ALL), which is the mean equivalent SAT score for admitted students; "Pell Grant" (PCTPELL), for fraction of all undergraduates who received a federal Pell grant for tuition; and "Student Loan" (PCTFLOAN), which indicates fraction of all undergraduates receiving a federal student loan. **(1)** The histograms show that all these selected variables are approximately normally distributed, with a few skewness that can be ingonred, except for the Median Earnings that we are mainly interested. 
+
+As specified above, Median Earnings should be our response variable. However, histogram shows that the distribution of Median Earnings is unimodal and severely right skewed with outliers at the tail. **(2)** Thus we propose that a log-transformation on the response variable to make the distribution more normal, as Figure 1 suggests.
+
+
+```{r, fig.width=5, fig.height=4, fig.cap="Histogram displaying the distributions of Median Earnings"}
+#boxplot(MD_EARN_WNE_P10~CONTROL, data = college, main = "Median Earnings by Instuition Types")
+par(mfrow = c(1,2))
+hist(college$MD_EARN_WNE_P10, xlab="Median Earnings", main="Median Earnings")
+hist(log(college$MD_EARN_WNE_P10), xlab="Median Earnings", main="Log-transformed Median Earnings")
+```
+
+Figure 2 depicts the multivariate relationship between the explanatory variables we choose and the response variables. We can see that SAT scores is strongly correlated with Median Earnings with a positive relationship, and Price has a somewhat weaker positive correlation. Meanwhile, the value of fraction of students who received Pell grant has a strong negative correlation with Median Earnings and the variable Student Loan has a weaker negative one. Lowess curves and individual residual analysis show that only Student Loan has an approximately linear relationship with the response variable, and the other three seem have be non-linear relationships. **(3)**
+
+```{r, message=FALSE,fig.width=5, fig.height=4, fig.cap="Multivariate EDA showing the relationship between predictors and the response "}
+library(GGally)
+ggpairs(college, columns = c(4:8), lower = list(continuous = wrap("smooth", method = "loess", pch=".")))
+```
+
+It is interesting to find that both Price and SAT scores are positively correlated with Median Earnings. This might suggest that students who pay for high tuitions and have good prior education performance are likely to earn more after they graduate. On the other hand, SAT scores are negatively correlated with financial aid variables, suggesting that students with weaker academic achievements tend to rely on financial aid to complete college education. And these students are more likely to earn less in the future compared to those who do not need financial aid.**(4)** These initial guesses might help us understand students' money-making abilities in further investigation. 
+
+
+# Modeling & Diagnostics
+
+The EDA told us that response variable Median Earnings have a strong correlation with the four predictors we choose after a log transformation. **(1) ** Thus we make the following linear model as required:
+
+  
+```{r, message=FALSE, results='hide'}
+library(mgcv)
+model1 = lm(log(MD_EARN_WNE_P10) ~ PRICE + SAT_AVG_ALL + PCTPELL + PCTFLOAN , data = college)
+model2 = gam(log(MD_EARN_WNE_P10) ~ s(PRICE, k = 4 + 1, fx = TRUE) + s(SAT_AVG_ALL, k = 4 + 1, fx = TRUE) + s(PCTPELL, k = 4 + 1,          fx = TRUE) + PCTFLOAN , data = college)
+summary(model1)
+summary(model2)
+```
+
+Linear Model 1: $log(Median Earnings) \sim \beta_0 + \beta_1(PRICE) + \beta_2(SAT) + \beta_3(PCTPELL) + \beta_4(PCTFLOAN) + \epsilon$ 
+
+The multivariate EDA above also shows that the explanatory variables PRICE, SAT Scores, and Pell Grant seem to non-linearly correlated with the response variable. Thus we use appropriate smooth splines to adjust for an additive model, with smooth splines fit on non-linear predictors with an effective degree of freedom of 4: 
+
+Additive Model 2: $\log(Median Earning) \sim \beta_0 + r1(s(Price, 4)) + r2(s(SAT, 4)) + r3(s(Pell Grant, 4)) + \beta_4(Student Loan) + \epsilon$   
+
+We control for a covariate by adding it into our model, like SAT scores and prior economic status, to separate the effects it has on the main predictor of interest Price. This can help us account for these covariates' effects on the response variable and better study the actual effects Price has on Median Earnings. **(2)**
+
+
+Figure 3 shows the residual analysis of the linear model and Figure 4 for the additive model. The residual plots of tow models show that both residuals are not fully randomly distributed since the residuals tend to scatter at the center, though there are no obvious patterns for the distributions. The residuals are approximately centered around the zero-line and almost have constant variance across observations despite some outliers are observed at the two ends. The normal QQ plots show that residuals are mostly falling along the best-fit line but still some outliers at both ends. Histograms show that both residuals are unimodal and bit right skewed which make them not perfectly normal. Thus I believe the two models roughly preserve most of the linearity and normality assumptions but some tweaks on the variables can still be applied. Some transformation on the predictors can be implemented or taking the effect of interaction terms between variables into account in further research. **(3)**
+
+```{r, fig.width=5, fig.height=3, fig.cap="Residual analysis of the linear model"}
+par(mfrow = c(1, 3))
+plot(fitted(model1), residuals(model1), pch=".", xlab="Fitted values", ylab="Residuals", main="Model 1 Residuals")
+abline(h=0, lty=5)
+
+qqnorm(resid(model1), main="Normal QQ plot Model1") 
+qqline(resid(model1))
+
+hist(residuals(model1), main="Histogram of Model 1 Residuals", xlab="Residuals")
+```
+
+
+```{r, fig.width=5, fig.height=3, fig.cap="Residual analysis of the additive model"}
+par(mfrow = c(1, 3))
+plot(fitted(model2), residuals(model2), pch=".", xlab="Fitted values", ylab="Residuals", main="Model 2 Residuals")
+abline(h=0, lty=5)
+
+qqnorm(resid(model2), main="Normal QQ plot Model2") 
+qqline(resid(model2))
+
+hist(residuals(model2), main="Histogram of Model 2 Residuals", xlab="Residuals")
+```
+
+
+We use 5-fold cross-validation to determine which one the two model makes a better fit to the college dataset. The following table shows the estimated MSE and standard error from cross-validation: 
+
+Table 1: Prediction Error from 5-fold Cross-Validation
+
+|                | Linear Model | Additive Model |
+|----------------|--------------|----------------|
+| Estimated MSE  | 53301187     | 50785912       |
+| Standard Error | 3507752      | 3343988        |
+
+
+The results indicate that the Additive Model 2 has a lower MSE and a smaller SE, which outperformed the linear model in both fields. **(4)** This can be explained by the characteristic of additive model since it allows lower bias than parametric bootstrapping results and add more flexibility.
+
+There seems to be no significant difference between two models although we believe Model 2 is better fit to the data. The training error of both models are around $2.477*10^{12}$ but the estimated MSE and SE of the additive model are lower that those of the linear model. The adjusted R-squared for the linear model is 50.9% while that of the additive model is higher at 53.1%. We perform an ANOVA F-test on the tow models and get a p-value of $7.945*10^{-9}$. Since the p-value is much lower than 0.05, we have sufficient evidence to reject the null hypothesis (linear model) and in favor of the additive model. **(5)** Based on the residual analysis of the additive model, residuals seem to have some correlation with observations since some assumptions might be violated. Since we do not know the exact distribution of residuals, we will proceed with bootstrapping by resampling residuals for this data. **(6)**
+
+
+
+# Results
+
+
+We find that for schools with very low tuition or very high ones, there is a negative relationship between Price and Median Earnings as indicated by Figure 5. For schools the majority of schools with tuition between 10000 and 30000, there is a positive relationship. Thus we can see that the majority of the schools demonstrate a positive relationship between Price and Earnings.
+
+```{r, fig.width=5, fig.height=4, fig.cap = "Smooth Spline for Price"}
+plot(model2, se = TRUE, select =1)
+```
+
+Using the additive model we choose, Figure 6 displays the relationship between school tuition and predicted future earnings, holding other variables constant. The dots are the predict values and the lowess line shows the regression trend line. We can clearly see that as Price increases, the amount of earnings also increase on average, holding other variables constant. The expected Median Earnings increase at a relatively slow rate if Price is less than 20000, since it only increases about 5000 if Price goes from 10000 to 20000. But the slope increases at a faster speed for Price larger than 20000, reaching an roughly added amount of 8000 if Price goes from 30000 to 40000. **(1)** All the p-values of the predictors included in the additive model are less than 0.05, indicating that they are all statistically significant and the model is valid. The model accounts for 53.1% of variability in the response variable, which is a fair amount for this dataset.
+
+
+```{r, fig.width=5, fig.height=4, fig.cap="Do students who attend more expensive schools earn more after graduation"}
+y = predict(model2, newdata = college)
+plot(college$PRICE, exp(y), xlab = "Price", ylab = "Median Earnings", pch = ".", main = "Prediction of Median Earnings vs. Price on Additive Model")
+lines(lowess(exp(y) ~ college$PRICE, f=8/10, iter=3), lty=1, col="blue")
+```
+
+
+It is interesting to find out whether the relationship between price and earnings is the same at public, private, and for-profit solutions. We include an interaction term in our model and use ANOVA F-test again on a reduced model and a full model to see if controlling for different institution types will cause a difference in the prediction. The hypotheses are the following:
+  
+$H_0: \text{The relationship between price and earnings is the same at public, private, and for-profit solutions.}$
+$H_A: \text{The relationship between price and earnings is different at public, private, and for-profit solutions.}$
+  
+The ANOVA F-test yields a p-value of 0.01897, which is less than 0.05. Thus have sufficient evidence to reject the null at a 95% confidence level, and conclude that the relationship between price and earnings is different at public, private, and for-profit solutions. This result is based on the assumption that the residuals are independent and normally distributed, and homoscedasticity is preserved. **(2)**
+
+As a Carnegie Mellon student, I would like to use my model to estimate for the mean earnings of students after graduation for a school just like Carnegie Mellon. The lower limit of the confidence interval is 65870.69, upper limit 71994.53, and the fit is 68864.57. Thus we are 95% confident that the mean earnings of students after graduation for a school just like Carnegie Mellon is between [65870.69, 71994.53]. The assumptions are the chosen model is similar to the true model, and residuals are normally distributed.**(3)** 
+
+The 95% confidence interval computed from pivotal bootstrapping by resampling residuals is [65930.45, 72037.08]. This interval is similiar to the previous one with the two bounds shift up a bit. This method is based on the assumption that the model's residuals are independent of each other with constant variance. We believe that the bootsrapping confidence interval is more relibale since it does not make any assumptions on the actual distribution of residuals, while the confidence interval computed from our model assumed that residuals are normal but might not be true. **(4)**
+
+
+# Conclusions
+
+   
+The results of this analysis provide strong evidence for a relationship between college tuition and median earnings for students after graduation. One linear model and another additive model are used in modeling the relationship, with the log-transformed Median Earnings as the response and Price, SAT Scores, Pell Grant, and Student Loan as explanatory variables. 
+
+
+Our final model is an additive model with Meidan Earnings as the response, Price as the predcitor and several other covariates including SAT Scores and Financial Aid Proportion, and possible confounder Institution Types. The mostly positive slope of the resulting regression line suggests that higher tuitions are generally associated with higher expected future earnings. We take confounding variable "Institution Types" into account and find that there is interaction and the Median Earnings increasing rate over Price will not be the same for public, private non-profit, and private for-profit schools. It is worth noted that higher SAT scores tend to lead to higher earnings as well while higher financial aid fraction of all stduents seems to lower future earnings on average. We used our final model to find the expected median earnings 10 years after enrty from a colledge just like CMU, and found that the pivotal bootstrap confidence interval is [65930.45, 72037.08]. **(1)**
+
+Such relationships could be due to the nature of education system in US. Top-ranked universities are likely to associated with high tuitions, but they also offer high-quality education and implement stricter standards on admission, including high SAT scores. Thus students with advanced academic achievements and sufficient fundings are more likely to be admitted into these high-ranked colleges and universities, and their education backgrounds are more likely to be recognized by recruiters as well as their working performance benefited from the high-quality education. On the other hand, students who do not have strong prior education and economic status are more likely to go to lower-ranked schools and acquire financial aids. They may not receive the best education and embrace less career opportunities compared to those academically and financially superior students. **(2)** 
+
+However, one should be careful that such relationship is only talking about Median Earnings but not individual earnings. Also note that the financial dataset only includes students who receive federal grants or loans, which suggests that such relationship needs further research when considering other students who don't receive financial aids. Other limitations include the varities of models we used and lack of data for significantly low and high tuition institutions. We expect making better inference given more time and data.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
