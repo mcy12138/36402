@@ -1,0 +1,212 @@
+---
+title: "36402 HW10"
+author: "Carl Yang"
+date: "4/18/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Q1
+
+```{r}
+gmp = read.csv("gmp.csv")
+library(mgcv)
+```
+
+
+## (a)
+
+```{r}
+model_A = lm(log(pcgmp)~log(pop),data=gmp)
+A_resid=resid(model_A) 
+par(mfrow=c(1,2)) 
+plot(A_resid~fitted(model_A),main="Model A Residual plot",xlab="fitted y values", ylab="Residuals") 
+abline(0,0,lty=1) 
+qqnorm(A_resid) 
+qqline(A_resid)
+```
+
+
+The residual plot of model A indicates that the residuals are approximately randomly distributed. Residuals scatter evenly with mean 0 but the variance tends to decrease. The  residuals are mostly fall on the fitted line in the normal QQ plot except for some outliers at both ends.  Thus only the assumption of independence between residuals and predictors and constant variability of residuals might be violated.
+
+## (b)
+
+```{r}
+model_B = gam(log(pcgmp) ~ log(pop)+s(log(finance),k=5,fx=T)+s(log(prof.tech),k=5,fx=T)+             s(log(ict),k=5,fx=T)+s(log(management),k=5,fx=TRUE),data=gmp) 
+B_resid=resid(model_B) 
+
+par(mfrow=c(1,2)) 
+plot(B_resid~fitted(model_B),main="Model B Residual plot",xlab="fitted y", ylab="Residuals") 
+abline(0,0,lty=1) 
+qqnorm(B_resid) 
+qqline(B_resid)
+```
+
+```{r}
+summary(model_B)
+```
+
+The residual plot looks similiar to the one we got above. Residuals are randomly scattered with mean 0 and the variablity decreases a lot compared to th previous model. More rsiduals fall onto the QQ line with very few outliers. The model summary shows that the constant term and the component smoother functions of log(finance), log(ict), log(management) are significant in model B. The adjusted R-squared is 0.346 which means the model explains 34.6% of variablity in the response variable log(pcgmp).
+
+## (c)
+
+```{r}
+anova(model_A,model_B,test="F")
+```
+
+```{r}
+par(mfrow=c(2,2)) 
+plot(model_B)
+```
+
+The ANOVA test above yields a result of p-value 6.137e-05, which is much smaller than 0.05. Thus we have sufficient evidence to reject the null hypothesis and conclude that the alternative larger Model B is correct.
+
+The summary output for Model B has a p-value 0.289. Thus we don't have sufficient evidence to reject the null that log(N) term is not significant. We conclude that we don't really need the log(N) term in Model B.
+
+From the plots for each of the component smooth function, we can see that the smooth functions for log(finance), log(prof.tech) and log(managemennt) are relatively linear with the slopes at the two tails slights differing from the rest of the line. This may be due the fact that outliers at the two ends are fewer than the majority cluster. Only he plot of the smooth function of log(ict) is non-linear. Thus, a non-linear fit for log(finance), log(prof.tech) and log(management) may not be needed and a non-linear fit for log(ict) is needed.
+
+## (d)
+
+```{r}
+set.seed(2020)
+B = 1000 
+n = nrow(gmp)
+
+# Method 1
+res1 = rep(0,B)
+sigma.hat=sd(A_resid)
+for (i in 1:B) {
+  error.pool1 = rnorm(n,mean=0,sd=sigma.hat) 
+  y.star1 = fitted(model_A)+error.pool1 
+  gmp$pcgmp=exp(y.star1) # data modified
+  A.bs1= lm(log(pcgmp)~log(pop),data=gmp)
+  B.bs1= gam(log(pcgmp)~log(pop)+s(log(finance),k=5,fx=T)+s(log(prof.tech),k=5,fx=T)
+             + s(log(ict),k=5,fx=T)+s(log(management),k=5,fx=T),data=gmp)
+  res1[i] =anova(A.bs1,B.bs1,test="F")$'F'[[2]]
+}
+
+# Method 2
+res2 = rep(0, B)
+for (j in 1:B) {
+  error.pool2 = sample(A_resid,size=n,replace=T)
+  y.star2 = fitted(model_A)+error.pool2
+  gmp$pcgmp=exp(y.star2)
+  A.bs2= lm(log(pcgmp)~log(pop),data=gmp)
+  B.bs2= gam(log(pcgmp)~log(pop)+s(log(finance),k=5,fx=T)+s(log(prof.tech),k=5,fx=T)
+             + s(log(ict),k=5,fx=T)+s(log(management),k=5,fx=T),data=gmp)
+  res2[j] = anova(A.bs2,B.bs2,test="F")$'F'[[2]]
+}
+```
+
+```{r}
+gmp = read.csv("gmp.csv") #re-read data
+```
+
+```{r}
+par(mfrow=c(1,2)) 
+qqplot(rf(B,16,115), res1 ,main="QQ plot for Method 1", xlab="Theoretical Quantiles",
+       ylab="Sample Quantiles") 
+qqline(res1, distribution = function(p) {qf(p, df1=16, df2=115)}) 
+
+qqplot(rf(B,16,115),res2,main="QQ plot for Method 2", xlab="Theoretical Quantiles",
+       ylab="Sample Quantiles") 
+qqline(res2, distribution = function(p) {qf(p, df1=16, df2=115)})
+```
+
+The null distribution of the F statistic ~ F(16, 155). The normal QQ plots of both residuals against the null distribution suggest that the residuals mostly fall on the normal QQ line with some outliers at the tail. We can conclude that the null distrbution of the F statistic used to test the hypotheses in part(c) is a F-distribution with the correct degrees of freedom 16 and 115.
+
+
+## (e)
+
+Using a "resample cases" requires us to sample the dataset and fit model A to the new dataset. Thus we are not using the null hypothesis that Model A is correct to do the F-test. Similarly, we are not bootstrapping the null distribution of the F statistic. In this case of performing a "resample cases" bootstrap, we are sampling from the sample data distribution as a close approximation of the population distribution.
+
+## (g)
+
+```{r}
+predict.gmp = gmp[c(10,34,70),]
+model_C=gam(log(pcgmp)~s(log(ict),k=5,fx=T)+s(log(management),k=5,fx=T),data=gmp)
+predict.se=round(predict(model_C,newdata=predict.gmp,se.fit=T)$se.fit,digits=5)
+predict.fit=predict(model_C,newdata=predict.gmp,se.fit=T)$fit 
+
+lower.90=predict.fit-predict.se*qt(1-0.1/2,df=124) 
+upper.90=predict.fit-predict.se*qt(0.1/2,df=124) 
+CI=data.frame(predict.lower.90=lower.90, predict.upper.90=upper.90, prediction.se=predict.se)
+```
+
+```{r}
+set.seed(2020)
+res=matrix(nrow=B,ncol=3) 
+for(i in 1:B) {
+  data.order=sample(1:n,size=n,replace=T) 
+  new.gmp=gmp[data.order,] 
+  C.bs=gam(log(pcgmp)~s(log(ict),k=5,fx=T)+s(log(management),k=5,fx=T),data=new.gmp) 
+  res[i,]=predict(C.bs,newdata=predict.gmp)
+}
+
+a=function(i){ 
+  return(quantile(res[,i], 0.95))
+} 
+
+b=function(i){
+  return(quantile(res[,i], 0.05)) 
+}
+
+pivotal.lower = 2*predict.fit - sapply(1:3,FUN=a) 
+pivotal.upper = 2*predict.fit - sapply(1:3,FUN=b) 
+CI$pivotal.lower.90=pivotal.lower 
+CI$pivotal.upper.90=pivotal.upper
+CI
+```
+
+```{r}
+par(mfrow=c(2,2)) 
+qqplot(rt(B,df=124),res[,1],xlab="Theoretical Quantiles", ylab="Sample Quantiles",
+                         main="QQ plot of prediction of Obs#10 ") 
+qqline(res[,1],distribution=function(p) {qt(p,df=124)}) 
+
+qqplot(rt(B,df=124),res[,2],xlab="Theoretical Quantiles", ylab="Sample Quantiles",
+       main="QQ plot of prediction of Obs#34 ") 
+qqline(res[,2],distribution=function(p) {qt(p,df=124)}) 
+
+qqplot(rt(B,df=124),res[,3],xlab="Theoretical Quantiles", ylab="Sample Quantiles",
+       main="QQ plot of prediction of Obs#70 ") 
+qqline(res[,3],distribution=function(p) {qt(p,df=124)})
+```
+
+The 90% confidence intervals estimated using resample cases bootstrap appear to be similar to the intervals from the predict function. The bias appears to be very small compared to the predicted values. The se.fit values produced by the predict function are also very small. When calculating the confidence interval with se.fit returned by the predict function, we used t-distribution with df=124. The Q-Q plots show the three r(xi) values with t distribution and dof=124. We can see that the most residuals fall on the qq line with some outliers at the two tails. We can conclude that the three sets of bootstrap values of r(xi) appear to have approximately the t distributions that correspond to confidence intervals that were computed without the bootstrap.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

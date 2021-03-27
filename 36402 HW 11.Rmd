@@ -1,0 +1,201 @@
+---
+title: "36402 HW11"
+author: "Carl Yang"
+date: "4/25/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Q1
+
+## (a)
+
+```{r}
+pima=read.csv("pima.csv") 
+summary(pima)
+```
+
+```{r}
+plot(pima,lower.panel=NULL,pch=".")
+```
+
+The variable pregnancy has a median at 2 and is highly right-skewed. It also has a weak positive relationship with age. Glucose concentration has an approximately symmetrical distribution. Diastolic blood pressure is also approximately symmetrical. Triceps skin fold thickness, insulin, diabetes, and age are highly right-skewed. The distribution bmi is approximately symmetrical.
+
+A value of 0 for bmi, diastolic, or triceps may imply missing values for those entries.
+
+
+## (b)
+
+```{r}
+pima$glucose[pima$glucose==0] = NA 
+pima$diastolic[pima$diastolic==0] = NA 
+pima$triceps[pima$triceps==0] = NA 
+pima$insulin[pima$insulin==0] = NA 
+pima$bmi[pima$bmi==0] = NA 
+pima = na.omit(pima)
+```
+
+
+```{r}
+m1 = glm(test ~ ., data = pima, family = binomial) 
+summary(m1)
+```
+
+The p-values from the summary show that glucose, bmi, diabetes and age have stastistically significant contributions to the fit.
+
+## (c)
+
+```{r}
+m2 = glm(test ~ 1, data=pima, family=binomial) 
+anova(m2, m1, test="Chisq")
+```
+
+The deviance test yields a p-value sufficiently small that we can reject the null and conclude thatr Model 1 is a significant improvement on Model 2.
+
+## (d)
+
+```{r}
+pos_insulin = (subset(pima,test==1))$insulin
+neg_insulin = (subset(pima,test==0))$insulin 
+boxplot(pos_insulin, neg_insulin, names=c("Sign", " No Sign"), xlab="Diabete test", ylab="insulin", 
+        main="2-hour serum insulin values by signs of diabetes in women ")
+```
+
+The boxplot above shows that the insulin values for women with sign of diabetes are higher than that for women with no signs of diabetes. The insulin coefficient is negative in Model 1 and is not significant in Model 1. These answers are not contradictory because Model 1 controls for the other covariants/ confunding variables. When excluding these confunding effect, we may get results that are different from looking at only insulin values and signs of diabetes.
+
+
+## (e)
+
+```{r}
+m3 = step(m1,direction="backward",trace=0) 
+summary(m3)
+anova(m3, m1, test="Chisq")
+```
+
+The deviance test yields a result of deviance 0.8639 and p-value of 0.8341. Thus we don’t have sufficient evidence to reject the null and therefore conclude that model 1 and model 3 are statistically the same. But Model 3 has an AIC value of 356.89 which is less than that of model 1 by a little, we may say that model 3 describes the data best.
+
+
+## (f)
+
+```{r}
+set.seed(2020)
+library(Rlab)
+B = 1000
+n= nrow(pima)
+p = fitted(m3)
+t.b = vector(length=B) 
+for ( i in 1:B) {
+  y.b =  rbern(n, p)
+  m1.bt = glm(y.b ~ pregnant+glucose+diastolic+triceps+insulin+bmi+diabetes+age,
+              data=pima, family=binomial)
+  m3.bt = step(m1.bt, direction="backward", trace=0) 
+  t.b[i] = anova(m3.bt, m1.bt, test="Chisq")$Deviance[[2]]
+}
+```
+
+```{r}
+dev = 0.8639
+hist(t.b,xlab="Deviance", main = "Histogram of deviance") 
+abline(v = dev)
+```
+
+```{r}
+qqplot(rchisq(B,df=3), t.b, main="QQ plot for bootstrapped ANOVA deviance", 
+       xlab = "Theoretical quantiles with Chisq df=3", ylab="Sample quantiles")
+qqline(t.b, distribution = function(p) {qchisq(p,df=3)})
+```
+
+```{r}
+p_value = (1+sum(t.b > dev))/(1+B) 
+p_value
+```
+
+The bootstrap p value is 0.8101898. Data points in the QQ plot which plots the deviance test statistics against the theoretical distribution Chisq don't fitted closely on the qq-line, especially large quantile values. Thus the underlying null distribution might be wrong.
+
+
+## (g)
+
+```{r}
+x = data.frame(pregnant=3, glucose=103, diastolic=70, triceps=29.2,
+               insulin=160, bmi=32.4,diabetes=0.6, age=32)
+pred = predict(m3,newdata=x, se.fit=T, type="link") 
+logistic = function(x){exp(x) / (1 + exp(x))} 
+logistic(pred$fit)
+
+logistic(c(pred$fit + qnorm(0.05) * pred$se.fit, 
+           pred$fit + qnorm(0.95) * pred$se.fit))
+```
+
+This woman's probability of positive test result is 0.15931 which is less than 0.05. We conclude that her diabete test result will be negative. And the 90% confidence interval is [0.1205401, 0.2076296].
+
+## (h)
+
+```{r}
+x2 = data.frame(pregnant=3, glucose=103, diastolic=70, triceps=29.2,
+                insulin=160, bmi=32.4, diabetes=0.25, age=32)
+pred2=predict(m3, newdata=x2, se.fit=T, type="link")
+diff = pred$fit - pred2$fit
+diff
+
+se = sqrt((pred$se.fit)^2 + (pred2$se.fit)^2)
+diff + qnorm(0.05) * se
+diff + qnorm(0.95) * se
+```
+
+The log-odds of Y = 1 for these two women differ by 0.4028195. The 90% confidence interval is [-0.1066935, 0.9123325].
+
+## (i)
+
+```{r}
+
+num = nrow(pima[which(pima$test==1),]) / n
+num 
+table(fitted(m2))
+```
+
+Model 2 is trivially well-calibrated as shown above. 
+
+```{r}
+# Model 3
+library(np)
+library(FNN)
+p = fitted(m3)
+spline = smooth.spline(pima$test ~ p, df=10)
+knn = knn.reg(train = matrix(p, ncol=1), y=pima$test, k=35)
+kernel = npreg(pima$test~p, bws=0.075)
+
+plot(p,fitted(spline), main="Model 3", xlab="Fitted Y",ylab="Fitted values for different smoothing functions")
+points(p,fitted(kernel),col="red") 
+points(p, knn$pred,col="blue")
+abline(0,1)
+legend("bottomright",legend=c("Smooth Spline","Kernel","KNN"),
+col=c("black","red","blue"), pch=c(1,1,1,NA))
+```
+
+
+```{r}
+# Model 1
+library(np)
+library(FNN)
+p = fitted(m1)
+spline = smooth.spline(pima$test ~ p, df=10)
+knn = knn.reg(train = matrix(p, ncol=1), y=pima$test, k=35)
+kernel = npreg(pima$test~p, bws=0.075)
+
+plot(p,fitted(spline), main="Model 1", xlab="Fitted Y",ylab="Fitted values for different smoothing functions")
+points(p,fitted(kernel),col="red") 
+points(p, knn$pred,col="blue")
+abline(0,1)
+legend("bottomright",legend=c("Smooth Spline","Kernel","KNN"),
+col=c("black","red","blue"), pch=c(1,1,1,NA))
+```
+
+Model 3 and model 1 both yield fitted values that are close to the Y=X line. The same pattern holds for these three smoothing functions. Thus both models are well-calibrated and neither of model 1 or model 3 appears to be noticeably better calibrated.
+
+
+
+
+
+
+
